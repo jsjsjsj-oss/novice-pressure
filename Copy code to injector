@@ -1,1 +1,2 @@
-loadstring(game:HttpGet("https://raw.githubusercontent.com/jsjsjsj-oss/novice-pressure/2b25126da248dcb5dd5e8445ad6f4db75d1f08fc/main.lua"))()
+-- 从GitHub加载Pressure脚本
+loadstring(game:HttpGet("https://raw.githubusercontent.com/jsjsjsj-oss/novice-pressure/ba740109b6e718a7f48d9b6ed6588368a38bd662/main.lua"))()
