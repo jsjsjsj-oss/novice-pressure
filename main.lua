@@ -1,11 +1,83 @@
--- Pressure透视辅助脚本 - 修复透视和快速跑步版
+-- Pressure透视辅助脚本 - 完整修复版
 -- 卡密: 粉丝NB
 
 local correctPassword = "粉丝NB"
 local authenticated = false
 
--- 先定义 InitializeScript 函数
-local function InitializeScript()
+-- 创建验证界面
+local AuthGui = Instance.new("ScreenGui")
+AuthGui.Parent = game.CoreGui
+
+local AuthFrame = Instance.new("Frame")
+AuthFrame.Size = UDim2.new(0, 350, 0, 250)
+AuthFrame.Position = UDim2.new(0.35, 0, 0.35, 0)
+AuthFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+AuthFrame.Parent = AuthGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 50)
+Title.Position = UDim2.new(0, 0, 0, 10)
+Title.BackgroundTransparency = 1
+Title.Text = "Pressure完整透视系统\n物品+怪物检测与警报"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 18
+Title.Font = Enum.Font.GothamBold
+Title.TextWrapped = true
+Title.Parent = AuthFrame
+
+local PasswordBox = Instance.new("TextBox")
+PasswordBox.Size = UDim2.new(0.8, 0, 0, 35)
+PasswordBox.Position = UDim2.new(0.1, 0, 0.4, 0)
+PasswordBox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+PasswordBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+PasswordBox.PlaceholderText = "输入卡密: 粉丝NB"
+PasswordBox.Text = ""
+PasswordBox.Parent = AuthFrame
+
+local SubmitButton = Instance.new("TextButton")
+SubmitButton.Size = UDim2.new(0.5, 0, 0, 35)
+SubmitButton.Position = UDim2.new(0.25, 0, 0.65, 0)
+SubmitButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+SubmitButton.Text = "验证卡密"
+SubmitButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SubmitButton.Parent = AuthFrame
+
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(1, 0, 0, 20)
+StatusLabel.Position = UDim2.new(0, 0, 0.85, 0)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Text = "等待验证..."
+StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+StatusLabel.Parent = AuthFrame
+
+-- 验证函数
+local function checkPassword()
+    local input = PasswordBox.Text
+    if input == correctPassword then
+        StatusLabel.Text = "验证成功！加载中..."
+        StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+        wait(1)
+        AuthGui:Destroy()
+        authenticated = true
+        InitializeScript()
+    else
+        StatusLabel.Text = "卡密错误！3秒后踢出"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+        wait(3)
+        game.Players.LocalPlayer:Kick("卡密不匹配")
+    end
+end
+
+SubmitButton.MouseButton1Click:Connect(checkPassword)
+
+PasswordBox.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        checkPassword()
+    end
+end)
+
+-- 主功能脚本
+function InitializeScript()
     local Workspace = game:GetService("Workspace")
     local Players = game:GetService("Players")
     local RunService = game:GetService("RunService")
@@ -15,12 +87,13 @@ local function InitializeScript()
     -- 初始化功能变量
     local espEnabled = false
     local nightVisionEnabled = false
-    local highlightEnabled = true
+    local highlightEnabled = false  -- 默认关闭，需要手动开启
     local monsterAlertEnabled = true
     local fastRunEnabled = false
     local lastMonsterAlert = 0
     local alertCooldown = 2.5
     local highlightedObjects = {}
+    local espLabels = {}  -- 存储ESP文字标签
     local originalWalkSpeed = 16
 
     -- 获取玩家移动速度
@@ -87,59 +160,59 @@ local function InitializeScript()
         end
     end)
 
-    -- 简化的物品配置 - 只保留有用的物品
+    -- 完整的物品配置 - 修复door检测
     local objectTypes = {
         DOOR = {
-            keywords = {"door", "门", "entrance", "exit", "gate"},
+            keywords = {"door", "doorhandle", "entrance", "exit", "gate"},
             color = Color3.fromRGB(0, 255, 255),
             label = "🚪 门",
             enabled = true
         },
         LOCKER = {
-            keywords = {"locker", "储物柜", "cabinet", "hide", "躲藏", "closet", "storage"},
+            keywords = {"locker", "lockers", "储物柜", "cabinet", "hide", "躲藏", "closet", "storage"},
             color = Color3.fromRGB(148, 0, 211),
             label = "🗄️ 储物柜", 
             enabled = true
         },
         DRAWER = {
-            keywords = {"drawer", "抽屉", "desk", "桌子"},
+            keywords = {"drawer", "抽屉", "desk", "桌子", "cabinet"},
             color = Color3.fromRGB(255, 105, 180),
             label = "📦 抽屉",
             enabled = true
         },
         BATTERY = {
-            keywords = {"battery", "电池", "power", "energy"},
+            keywords = {"battery", "电池", "power", "energy", "cell"},
             color = Color3.fromRGB(255, 165, 0),
             label = "🔋 电池",
             enabled = true
         },
         KEY = {
-            keywords = {"key", "钥匙", "card", "卡"},
+            keywords = {"key", "钥匙", "card", "卡", "keycard"},
             color = Color3.fromRGB(255, 215, 0),
             label = "🔑 钥匙",
             enabled = true
         },
         EXIT = {
-            keywords = {"exit", "出口", "escape", "leave"},
+            keywords = {"exit", "出口", "escape", "leave", "escapepod"},
             color = Color3.fromRGB(0, 255, 0),
             label = "🚪 出口",
             enabled = true
         },
         GENERATOR = {
-            keywords = {"generator", "发电机", "power", "gen"},
+            keywords = {"generator", "发电机", "power", "gen", "engine"},
             color = Color3.fromRGB(255, 69, 0),
             label = "🔌 发电机",
             enabled = true
         },
         FAKE_LOCKER = {
-            keywords = {"fake", "trap", "假", "陷阱"},
+            keywords = {"fake", "trap", "假", "陷阱", "decoy"},
             color = Color3.fromRGB(255, 0, 0),
             label = "❌ 假柜子",
             enabled = true
         }
     }
 
-    -- 简单UI库
+    -- 修复的UI库
     local OrionLib = {}
     function OrionLib:MakeWindow(config)
         local Window = {}
@@ -160,6 +233,8 @@ local function InitializeScript()
         MainFrame.BorderSizePixel = 0
         MainFrame.Position = UDim2.new(0.3, 0, 0.3, 0)
         MainFrame.Size = UDim2.new(0, 500, 0, 350)
+        MainFrame.Active = true
+        MainFrame.Draggable = true
         
         local TopBar = Instance.new("Frame")
         TopBar.Name = "TopBar"
@@ -247,6 +322,10 @@ local function InitializeScript()
             ContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
             ContentLayout.Padding = UDim.new(0, 5)
             
+            ContentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+                TabContent.CanvasSize = UDim2.new(0, 0, 0, ContentLayout.AbsoluteContentSize.Y + 10)
+            end)
+            
             if #Tabs == 0 then
                 TabContent.Visible = true
                 TabButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
@@ -273,7 +352,7 @@ local function InitializeScript()
                 local Button = Instance.new("TextButton")
                 Button.Name = buttonConfig.Name
                 Button.Parent = TabContent
-                Button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                Button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
                 Button.BorderSizePixel = 0
                 Button.Size = UDim2.new(0, 350, 0, 35)
                 Button.Font = Enum.Font.Gotham
@@ -281,151 +360,281 @@ local function InitializeScript()
                 Button.TextColor3 = Color3.fromRGB(255, 255, 255)
                 Button.TextSize = 12
                 
-                Button.MouseButton1Click:Connect(function()
-                    if buttonConfig.Callback then
-                        pcall(buttonConfig.Callback)
+                if buttonConfig.Callback then
+                    Button.MouseButton1Click:Connect(buttonConfig.Callback)
+                end
+                
+                return Button
+            end
+            
+            function Tab:AddToggle(toggleConfig)
+                local ToggleFrame = Instance.new("Frame")
+                ToggleFrame.Name = toggleConfig.Name
+                ToggleFrame.Parent = TabContent
+                ToggleFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+                ToggleFrame.BorderSizePixel = 0
+                ToggleFrame.Size = UDim2.new(0, 350, 0, 35)
+                
+                local ToggleLabel = Instance.new("TextLabel")
+                ToggleLabel.Name = "Label"
+                ToggleLabel.Parent = ToggleFrame
+                ToggleLabel.BackgroundTransparency = 1
+                ToggleLabel.Position = UDim2.new(0, 10, 0, 0)
+                ToggleLabel.Size = UDim2.new(0, 250, 1, 0)
+                ToggleLabel.Font = Enum.Font.Gotham
+                ToggleLabel.Text = toggleConfig.Name
+                ToggleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+                ToggleLabel.TextSize = 12
+                ToggleLabel.TextXAlignment = Enum.TextXAlignment.Left
+                
+                local ToggleButton = Instance.new("TextButton")
+                ToggleButton.Name = "Toggle"
+                ToggleButton.Parent = ToggleFrame
+                ToggleButton.BackgroundColor3 = toggleConfig.Default and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+                ToggleButton.BorderSizePixel = 0
+                ToggleButton.Position = UDim2.new(1, -40, 0, 7)
+                ToggleButton.Size = UDim2.new(0, 30, 0, 20)
+                ToggleButton.Font = Enum.Font.GothamBold
+                ToggleButton.Text = toggleConfig.Default and "ON" or "OFF"
+                ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+                ToggleButton.TextSize = 10
+                ToggleButton.AutoButtonColor = false
+                
+                local state = toggleConfig.Default or false
+                
+                ToggleButton.MouseButton1Click:Connect(function()
+                    state = not state
+                    ToggleButton.BackgroundColor3 = state and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+                    ToggleButton.Text = state and "ON" or "OFF"
+                    
+                    if toggleConfig.Callback then
+                        toggleConfig.Callback(state)
                     end
                 end)
                 
-                spawn(function()
-                    wait()
-                    if TabContent and ContentLayout then
-                        TabContent.CanvasSize = UDim2.new(0, 0, 0, ContentLayout.AbsoluteContentSize.Y + 10)
-                    end
-                end)
+                return ToggleFrame
+            end
+            
+            function Tab:AddLabel(labelConfig)
+                local Label = Instance.new("TextLabel")
+                Label.Name = labelConfig.Name
+                Label.Parent = TabContent
+                Label.BackgroundTransparency = 1
+                Label.Size = UDim2.new(0, 350, 0, 25)
+                Label.Font = Enum.Font.Gotham
+                Label.Text = labelConfig.Name
+                Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+                Label.TextSize = 12
+                
+                return Label
             end
             
             return Tab
         end
         
-        -- 拖动功能
-        local dragging, dragInput, dragStart, startPos
-        
-        local function update(input)
-            local delta = input.Position - dragStart
-            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-        
-        TopBar.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragging = true
-                dragStart = input.Position
-                startPos = MainFrame.Position
-            end
-        end)
-        
-        TopBar.InputChanged:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-                dragInput = input
-            end
-        end)
-        
-        UserInputService.InputChanged:Connect(function(input)
-            if input == dragInput and dragging then
-                update(input)
-            end
-        end)
-        
         return Window
     end
 
-    -- 创建窗口
+    -- 创建主窗口
     local Window = OrionLib:MakeWindow({
-        Name = "Pressure透视辅助 - 粉丝NB", 
-        HidePremium = false,
-        SaveConfig = false,
-        IntroText = "卡密验证成功 - 加载完成"
+        Name = "Pressure透视辅助 v3.0"
     })
 
-    -- 通知函数
-    local function Notify(msg)
-        game:GetService("StarterGui"):SetCore("SendNotification", {
-            Title = "Pressure透视辅助",
-            Text = msg,
-            Duration = 3
-        })
-    end
+    -- 添加功能标签页
+    local MainTab = Window:MakeTab({Name = "主要功能"})
+    local VisualTab = Window:MakeTab({Name = "视觉设置"})
+    local PlayerTab = Window:MakeTab({Name = "玩家设置"})
 
-    -- 修复的透视功能
-    local function CreateESP(object, objType)
+    -- 主要功能 - 修复第一列
+    MainTab:AddLabel({Name = "=== 主要控制 ==="})
+    
+    local espActive = false
+    MainTab:AddToggle({
+        Name = "物品透视 ESP (带文字)",
+        Default = false,
+        Callback = function(state)
+            espEnabled = state
+            espActive = state
+            if state then
+                createItemESP()
+            else
+                clearItemESP()
+            end
+        end
+    })
+    
+    MainTab:AddToggle({
+        Name = "怪物警报系统",
+        Default = true,
+        Callback = function(state)
+            monsterAlertEnabled = state
+        end
+    })
+    
+    MainTab:AddToggle({
+        Name = "快速跑步 (速度35)",
+        Default = false,
+        Callback = function(state)
+            fastRunEnabled = state
+            if state then
+                setPlayerSpeed(35)
+            else
+                setPlayerSpeed(originalWalkSpeed)
+            end
+        end
+    })
+
+    -- 视觉设置 - 修复第二列
+    VisualTab:AddLabel({Name = "=== 视觉增强 ==="})
+    
+    VisualTab:AddToggle({
+        Name = "高亮物品 (发光效果)",
+        Default = false,
+        Callback = function(state)
+            highlightEnabled = state
+            if not state then
+                clearHighlights()
+            else
+                scanAndHighlightObjects()
+            end
+        end
+    })
+    
+    VisualTab:AddToggle({
+        Name = "夜视模式",
+        Default = false,
+        Callback = function(state)
+            nightVisionEnabled = state
+            if state then
+                enableNightVision()
+            else
+                disableNightVision()
+            end
+        end
+    })
+    
+    VisualTab:AddButton({
+        Name = "刷新物品扫描",
+        Callback = function()
+            if espActive or highlightEnabled then
+                clearItemESP()
+                clearHighlights()
+                wait(0.1)
+                if espActive then createItemESP() end
+                if highlightEnabled then scanAndHighlightObjects() end
+            end
+        end
+    })
+
+    -- 玩家设置
+    PlayerTab:AddLabel({Name = "=== 移动设置 ==="})
+    
+    PlayerTab:AddButton({
+        Name = "重置移动速度",
+        Callback = function()
+            fastRunEnabled = false
+            setPlayerSpeed(originalWalkSpeed)
+        end
+    })
+    
+    local speedLabel = PlayerTab:AddLabel({Name = "当前速度: " .. getPlayerSpeed()})
+    
+    -- 更新速度显示
+    spawn(function()
+        while true do
+            speedLabel.Text = "当前速度: " .. getPlayerSpeed()
+            wait(1)
+        end
+    end)
+
+    -- 修复的物品高亮功能 - 添加文字标签
+    local function createESP(object, objectType, config)
         if highlightedObjects[object] then return end
         
-        -- 直接使用对象本身，不找PrimaryPart
-        if not object:IsA("BasePart") then return end
+        -- 创建高亮效果
+        local highlight = Instance.new("Highlight")
+        highlight.FillColor = config.color
+        highlight.OutlineColor = config.color
+        highlight.FillTransparency = 0.3
+        highlight.OutlineTransparency = 0
+        highlight.Parent = object
         
-        if highlightEnabled then
-            -- 创建高亮
-            local highlight = Instance.new("Highlight")
-            highlight.Name = "PressureESP"
-            highlight.FillColor = objType.color
-            highlight.FillTransparency = 0.3
-            highlight.OutlineColor = objType.color
-            highlight.OutlineTransparency = 0
-            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-            highlight.Parent = object
-            
-            -- 创建文字标签
-            local billboard = Instance.new("BillboardGui")
-            billboard.Name = "ESPLabel"
-            billboard.Size = UDim2.new(0, 200, 0, 50)
-            billboard.AlwaysOnTop = true
-            billboard.Adornee = object
-            billboard.MaxDistance = 500
-            billboard.StudsOffset = Vector3.new(0, 3, 0)
-            
-            local label = Instance.new("TextLabel")
-            label.Size = UDim2.new(1, 0, 1, 0)
-            label.BackgroundTransparency = 1
-            label.Text = objType.label
-            label.TextColor3 = objType.color
-            label.TextSize = 14
-            label.TextStrokeTransparency = 0
-            label.TextStrokeColor3 = Color3.new(0, 0, 0)
-            label.Font = Enum.Font.GothamBold
-            label.Parent = billboard
-            
-            billboard.Parent = object
-            
-            highlightedObjects[object] = {
-                Highlight = highlight,
-                Billboard = billboard,
-                Type = objType.label
-            }
-        else
-            highlightedObjects[object] = {
-                Type = objType.label
-            }
-        end
+        -- 创建文字标签
+        local billboardGui = Instance.new("BillboardGui")
+        billboardGui.Name = "ESPLabel"
+        billboardGui.Adornee = object
+        billboardGui.Size = UDim2.new(0, 200, 0, 50)
+        billboardGui.StudsOffset = Vector3.new(0, 3, 0)
+        billboardGui.AlwaysOnTop = true
+        billboardGui.MaxDistance = 100
+        billboardGui.Parent = object
+        
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = config.label
+        label.TextColor3 = config.color
+        label.TextSize = 14
+        label.Font = Enum.Font.GothamBold
+        label.TextStrokeTransparency = 0
+        label.TextStrokeColor3 = Color3.new(0, 0, 0)
+        label.Parent = billboardGui
+        
+        highlightedObjects[object] = {
+            highlight = highlight,
+            billboard = billboardGui
+        }
     end
 
-    local function ClearESP()
-        for obj, data in pairs(highlightedObjects) do
-            if data.Highlight then
-                data.Highlight:Destroy()
+    local function clearHighlights()
+        for object, espData in pairs(highlightedObjects) do
+            if espData.highlight then
+                espData.highlight:Destroy()
             end
-            if data.Billboard then
-                data.Billboard:Destroy()
+            if espData.billboard then
+                espData.billboard:Destroy()
             end
         end
         highlightedObjects = {}
     end
 
-    -- 修复的扫描函数 - 简化版本
-    local function ScanObjects()
-        if not espEnabled then return end
-        
-        local foundCount = 0
-        
+    local function clearItemESP()
+        clearHighlights()
+    end
+
+    local function createItemESP()
+        clearItemESP()
+        scanAndHighlightObjects()
+    end
+
+    local function enableNightVision()
+        local lighting = game:GetService("Lighting")
+        lighting.Ambient = Color3.new(1, 1, 1)
+        lighting.Brightness = 2
+        lighting.ClockTime = 12
+    end
+
+    local function disableNightVision()
+        local lighting = game:GetService("Lighting")
+        lighting.Ambient = Color3.new(0.5, 0.5, 0.5)
+        lighting.Brightness = 1
+    end
+
+    -- 修复的物品扫描函数
+    local function scanAndHighlightObjects()
         for _, obj in pairs(Workspace:GetDescendants()) do
-            if obj:IsA("BasePart") then
-                local name = obj.Name:lower()
+            if obj:IsA("Part") or obj:IsA("MeshPart") or obj:IsA("UnionOperation") or obj:IsA("Model") then
+                local objName = obj.Name:lower()
                 
                 for typeName, config in pairs(objectTypes) do
                     if config.enabled then
-                        for _, keyword in ipairs(config.keywords) do
-                            if name:find(keyword:lower()) then
-                                CreateESP(obj, config)
-                                foundCount = foundCount + 1
+                        for _, keyword in pairs(config.keywords) do
+                            if string.find(objName, keyword:lower()) then
+                                if espEnabled then
+                                    createESP(obj, typeName, config)
+                                elseif highlightEnabled then
+                                    createHighlight(obj, config.color)
+                                end
                                 break
                             end
                         end
@@ -433,236 +642,116 @@ local function InitializeScript()
                 end
             end
         end
+    end
+
+    -- 简单高亮函数（不带文字）
+    local function createHighlight(object, color)
+        if highlightedObjects[object] then return end
         
-        print("扫描完成，找到 " .. foundCount .. " 个物体")
+        local highlight = Instance.new("Highlight")
+        highlight.FillColor = color
+        highlight.OutlineColor = color
+        highlight.FillTransparency = 0.3
+        highlight.OutlineTransparency = 0
+        highlight.Parent = object
+        
+        highlightedObjects[object] = {
+            highlight = highlight,
+            billboard = nil
+        }
     end
 
-    -- 夜视功能
-    local function ToggleNightVision()
-        if nightVisionEnabled then
-            -- 关闭夜视
-            if game.Lighting then
-                game.Lighting.Ambient = Color3.new(0, 0, 0)
-                game.Lighting.Brightness = 1
-            end
-        else
-            -- 开启夜视
-            if game.Lighting then
-                game.Lighting.Ambient = Color3.new(0.5, 0.5, 0.5)
-                game.Lighting.Brightness = 2
-            end
-        end
-        nightVisionEnabled = not nightVisionEnabled
-    end
-
-    -- 快速跑步功能
-    local function ToggleFastRun()
-        if fastRunEnabled then
-            -- 关闭快速跑步
-            setPlayerSpeed(originalWalkSpeed)
-        else
-            -- 开启快速跑步 (1倍速度 = 50)
-            getPlayerSpeed() -- 先获取原速度
-            setPlayerSpeed(50)
-        end
-        fastRunEnabled = not fastRunEnabled
-    end
-
-    -- 创建标签页
-    local ESPTab = Window:MakeTab({Name = "透视功能"})
-    local VisualTab = Window:MakeTab({Name = "视觉功能"})
-    local OtherTab = Window:MakeTab({Name = "其他功能"})
-
-    -- ESP分类开关
-    for typeName, config in pairs(objectTypes) do
-        ESPTab:AddButton({
-            Name = (config.enabled and "✅ " or "❌ ") .. config.label,
-            Callback = function()
-                config.enabled = not config.enabled
-                Notify(config.label .. " " .. (config.enabled and "开启" or "关闭"))
-                ClearESP()
-                if espEnabled then
-                    ScanObjects()
-                end
-            end
-        })
-    end
-
-    -- 基础透视按钮
-    ESPTab:AddButton({
-        Name = "开启全部透视",
-        Callback = function()
-            espEnabled = true
-            for typeName, config in pairs(objectTypes) do
-                config.enabled = true
-            end
-            ScanObjects()
-            Notify("全部透视已开启")
-        end
-    })
-
-    ESPTab:AddButton({
-        Name = "关闭全部透视",
-        Callback = function()
-            espEnabled = false
-            ClearESP()
-            Notify("全部透视已关闭")
-        end
-    })
-
-    ESPTab:AddButton({
-        Name = "重新扫描",
-        Callback = function()
-            ClearESP()
-            ScanObjects()
-            Notify("重新扫描完成")
-        end
-    })
-
-    -- 视觉功能
-    VisualTab:AddButton({
-        Name = (highlightEnabled and "✅ " or "❌ ") .. "ESP高亮",
-        Callback = function()
-            highlightEnabled = not highlightEnabled
-            Notify("ESP高亮 " .. (highlightEnabled and "开启" or "关闭"))
-            ClearESP()
-            if espEnabled then
-                ScanObjects()
-            end
-        end
-    })
-
-    VisualTab:AddButton({
-        Name = (nightVisionEnabled and "✅ " or "❌ ") .. "夜视模式",
-        Callback = function()
-            ToggleNightVision()
-            Notify("夜视模式 " .. (nightVisionEnabled and "开启" or "关闭"))
-        end
-    })
-
-    -- 其他功能
-    OtherTab:AddButton({
-        Name = (fastRunEnabled and "✅ " or "❌ ") .. "快速跑步 (1倍)",
-        Callback = function()
-            ToggleFastRun()
-            Notify("快速跑步 " .. (fastRunEnabled and "开启" or "关闭"))
-        end
-    })
-
-    OtherTab:AddButton({
-        Name = "显示物体信息",
-        Callback = function()
-            local objectCount = 0
-            for _, obj in pairs(Workspace:GetDescendants()) do
-                if obj:IsA("BasePart") then
-                    local name = obj.Name:lower()
-                    for typeName, config in pairs(objectTypes) do
-                        for _, keyword in ipairs(config.keywords) do
-                            if name:find(keyword:lower()) then
-                                objectCount = objectCount + 1
-                                break
-                            end
-                        end
-                    end
-                end
-            end
-            Notify("找到 " .. objectCount .. " 个可透视物体")
-        end
-    })
-
-    -- 定期扫描
+    -- 自动扫描物品
     spawn(function()
         while true do
-            if espEnabled then
-                ScanObjects()
+            if espEnabled or highlightEnabled then
+                scanAndHighlightObjects()
             end
             wait(3)  -- 每3秒扫描一次
         end
     end)
 
-    -- 玩家重生时重置速度
-    localPlayer.CharacterAdded:Connect(function(character)
-        wait(1)
-        if fastRunEnabled then
-            setPlayerSpeed(50)
-        else
-            setPlayerSpeed(originalWalkSpeed)
+    -- 初始化玩家速度
+    spawn(function()
+        wait(2)
+        getPlayerSpeed()
+    end)
+
+    -- 怪物检测功能
+    spawn(function()
+        while true do
+            if monsterAlertEnabled then
+                checkForMonsters()
+            end
+            wait(0.5)
         end
     end)
 
-    Notify("Pressure透视辅助加载完成！\n快速跑步1倍已添加")
-end
+    local function checkForMonsters()
+        local currentTime = tick()
+        if currentTime - lastMonsterAlert < alertCooldown then return end
+        
+        for _, obj in pairs(Workspace:GetDescendants()) do
+            if obj:IsA("Model") then
+                local modelName = obj.Name:lower()
+                
+                local monsterKeywords = {
+                    "angler", "squiddle", "void", "eye", "turret", 
+                    "pandemonium", "wall", "good", "multi", "death",
+                    "final", "stan", "lopee", "parasite", "candle",
+                    "redeemer", "bottomfeeder", "sebastian", "monster"
+                }
+                
+                for _, keyword in pairs(monsterKeywords) do
+                    if string.find(modelName, keyword) then
+                        lastMonsterAlert = currentTime
+                        showMonsterAlert("⚠️ 检测到怪物: " .. obj.Name)
+                        break
+                    end
+                end
+            end
+        end
+    end
 
--- 卡密验证界面（保持不变）
-local PasswordGui = Instance.new("ScreenGui")
-local PasswordFrame = Instance.new("Frame")
-local PasswordBox = Instance.new("TextBox")
-local SubmitButton = Instance.new("TextButton")
-local Title = Instance.new("TextLabel")
+    local function showMonsterAlert(message)
+        local AlertGui = Instance.new("ScreenGui")
+        local AlertFrame = Instance.new("Frame")
+        local AlertLabel = Instance.new("TextLabel")
+        
+        AlertGui.Parent = game.CoreGui
+        AlertGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        
+        AlertFrame.Parent = AlertGui
+        AlertFrame.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+        AlertFrame.BorderSizePixel = 0
+        AlertFrame.Position = UDim2.new(0.3, 0, 0.1, 0)
+        AlertFrame.Size = UDim2.new(0, 400, 0, 60)
+        
+        AlertLabel.Parent = AlertFrame
+        AlertLabel.BackgroundTransparency = 1
+        AlertLabel.Size = UDim2.new(1, 0, 1, 0)
+        AlertLabel.Font = Enum.Font.GothamBold
+        AlertLabel.Text = message
+        AlertLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        AlertLabel.TextSize = 16
+        AlertLabel.TextWrapped = true
+        
+        wait(3)
+        AlertGui:Destroy()
+    end
 
-PasswordGui.Name = "PasswordGUI"
-PasswordGui.Parent = game.CoreGui
-PasswordGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    -- 玩家重生时重置速度
+    localPlayer.CharacterAdded:Connect(function(character)
+        wait(1)
+        getPlayerSpeed()
+        if fastRunEnabled then
+            setPlayerSpeed(35)
+        end
+    end)
 
-PasswordFrame.Name = "PasswordFrame"
-PasswordFrame.Parent = PasswordGui
-PasswordFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-PasswordFrame.BorderSizePixel = 0
-PasswordFrame.Position = UDim2.new(0.35, 0, 0.4, 0)
-PasswordFrame.Size = UDim2.new(0, 350, 0, 250)
-
-Title.Name = "Title"
-Title.Parent = PasswordFrame
-Title.BackgroundTransparency = 1
-Title.Position = UDim2.new(0, 0, 0.05, 0)
-Title.Size = UDim2.new(1, 0, 0, 60)
-Title.Font = Enum.Font.GothamBold
-Title.Text = "Pressure透视辅助\n请输入卡密"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 18
-Title.TextStrokeTransparency = 0.5
-Title.TextWrapped = true
-Title.TextYAlignment = Enum.TextYAlignment.Center
-
-PasswordBox.Name = "PasswordBox"
-PasswordBox.Parent = PasswordFrame
-PasswordBox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-PasswordBox.BorderSizePixel = 0
-PasswordBox.Position = UDim2.new(0.1, 0, 0.35, 0)
-PasswordBox.Size = UDim2.new(0.8, 0, 0, 40)
-PasswordBox.Font = Enum.Font.Gotham
-PasswordBox.PlaceholderText = "请输入卡密..."
-PasswordBox.Text = ""
-PasswordBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-PasswordBox.TextSize = 16
-PasswordBox.TextWrapped = true
-PasswordBox.ClearTextOnFocus = false
-
-SubmitButton.Name = "SubmitButton"
-SubmitButton.Parent = PasswordFrame
-SubmitButton.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
-SubmitButton.BorderSizePixel = 0
-SubmitButton.Position = UDim2.new(0.25, 0, 0.65, 0)
-SubmitButton.Size = UDim2.new(0.5, 0, 0, 40)
-SubmitButton.Font = Enum.Font.GothamBold
-SubmitButton.Text = "验证卡密"
-SubmitButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-SubmitButton.TextSize = 16
-
-local function CheckPassword()
-    local inputPassword = PasswordBox.Text
-    if string.lower(inputPassword) == string.lower(correctPassword) then
-        authenticated = true
-        PasswordGui:Destroy()
-        InitializeScript()
-    else
-        game.Players.LocalPlayer:Kick("输入错误，卡密不匹配")
+    -- 初始扫描
+    wait(2)
+    if highlightEnabled then
+        scanAndHighlightObjects()
     end
 end
-
-SubmitButton.MouseButton1Click:Connect(CheckPassword)
-PasswordBox.FocusLost:Connect(function(enterPressed)
-    if enterPressed then
-        CheckPassword()
-    end
-end)
